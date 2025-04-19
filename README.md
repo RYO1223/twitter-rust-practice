@@ -29,3 +29,13 @@ You can use `curl` to send a POST request to the server. Here is an example:
 ```bash
 curl -X POST -H "Content-Type: application/json" -d '{"user":"example_user","content":"Hello, world!"}' http://127.0.0.1:8080/post_tweet
 ```
+
+## Accessing the OpenAPI Documentation
+
+You can access the OpenAPI documentation using Swagger UI. After running the backend server, open your web browser and navigate to:
+
+```
+http://127.0.0.1:8080/swagger-ui
+```
+
+This will display the Swagger UI interface where you can explore the API endpoints and interact with them.
