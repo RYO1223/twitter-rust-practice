@@ -1,4 +1,6 @@
 // Export models
-mod post;
+pub mod post;
+pub mod user;
 
-pub use post::Post;
+pub use post::{CreatePostRequest, NewPost, Post};
+pub use user::{NewUser, User};
