@@ -14,12 +14,10 @@ diesel::table! {
         id -> Int4,
         username -> Varchar,
         created_at -> Timestamp,
+        password_hash -> Varchar,
     }
 }
 
 diesel::joinable!(posts -> users (user_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    posts,
-    users,
-);
+diesel::allow_tables_to_appear_in_same_query!(posts, users,);

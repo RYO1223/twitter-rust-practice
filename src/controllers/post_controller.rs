@@ -10,8 +10,12 @@ use crate::schema::{posts, users};
 #[utoipa::path(
     get,
     path = "/posts",
+    security(
+        ("bearer_auth" = [])
+    ),
     responses(
         (status = 200, description = "List of all posts", body = Vec<Post>),
+        (status = 401, description = "Unauthorized"),
         (status = 500, description = "Server error")
     )
 )]
@@ -72,8 +76,12 @@ pub async fn get_all_posts(pool: web::Data<DbPool>) -> impl Responder {
 #[utoipa::path(
     get,
     path = "/posts/{id}",
+    security(
+        ("bearer_auth" = [])
+    ),
     responses(
         (status = 200, description = "The post was found", body = Post),
+        (status = 401, description = "Unauthorized"),
         (status = 404, description = "Post not found"),
         (status = 500, description = "Server error")
     )
@@ -132,9 +140,13 @@ pub async fn get_post_by_id(pool: web::Data<DbPool>, id: web::Path<i32>) -> impl
     post,
     path = "/posts",
     request_body = CreatePostRequest,
+    security(
+        ("bearer_auth" = [])
+    ),
     responses(
         (status = 201, description = "Post created successfully", body = Post),
         (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
         (status = 500, description = "Server error")
     )
 )]
@@ -157,6 +169,7 @@ pub async fn create_post(
                 // Create new user if not found
                 let new_user = NewUser {
                     username: post_req.username.clone(),
+                    password_hash: "default_password_hash".to_string(), // Default password hash for users created via posts
                 };
 
                 diesel::insert_into(users::table)
@@ -204,8 +217,12 @@ pub async fn create_post(
     put,
     path = "/posts/{id}",
     request_body = CreatePostRequest,
+    security(
+        ("bearer_auth" = [])
+    ),
     responses(
         (status = 200, description = "Post updated successfully", body = Post),
+        (status = 401, description = "Unauthorized"),
         (status = 404, description = "Post not found"),
         (status = 500, description = "Server error")
     )
@@ -243,6 +260,7 @@ pub async fn update_post(
                 // Create new user if not found
                 let new_user = NewUser {
                     username: post_req.username.clone(),
+                    password_hash: "default_password_hash".to_string(), // Default password hash for users created via posts
                 };
 
                 diesel::insert_into(users::table)
@@ -289,8 +307,12 @@ pub async fn update_post(
 #[utoipa::path(
     delete,
     path = "/posts/{id}",
+    security(
+        ("bearer_auth" = [])
+    ),
     responses(
         (status = 204, description = "Post deleted successfully"),
+        (status = 401, description = "Unauthorized"),
         (status = 404, description = "Post not found"),
         (status = 500, description = "Server error")
     )

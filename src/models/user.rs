@@ -21,6 +21,9 @@ pub struct User {
     /// Timestamp when the user was created
     #[schema(value_type = String, format = "date-time", example = "2025-04-19T07:30:00")]
     pub created_at: NaiveDateTime,
+    /// Hashed password for authentication
+    #[serde(skip_serializing)]
+    pub password_hash: String,
 }
 
 /// Used for creating new users in the database
@@ -29,4 +32,6 @@ pub struct User {
 pub struct NewUser {
     /// Username for the new user
     pub username: String,
+    /// Password hash for authentication
+    pub password_hash: String,
 }
