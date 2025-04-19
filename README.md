@@ -27,5 +27,5 @@
 You can use `curl` to send a POST request to the server. Here is an example:
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"user":"example_user","content":"Hello, world!"}' http://127.0.0.1:8080/post_tweet
+curl -X POST -H "Content-Type: application/json" -d '{"user":"example_user","content":"Hello, world!"}' http://127.0.0.1:8080/create_post
 ```

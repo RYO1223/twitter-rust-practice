@@ -7,13 +7,21 @@ use actix_web::{App, HttpServer, web};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use controllers::post_tweet;
+use controllers::post_controller::{
+    create_post, delete_post, get_all_posts, get_post_by_id, update_post,
+};
 use dotenv::dotenv;
 use std::env;
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(controllers::tweet_controller::post_tweet),
+    paths(
+        controllers::post_controller::get_all_posts,
+        controllers::post_controller::get_post_by_id,
+        controllers::post_controller::create_post,
+        controllers::post_controller::update_post,
+        controllers::post_controller::delete_post
+    ),
     components(schemas(models::Post, models::CreatePostRequest, models::User))
 )]
 struct ApiDoc;
@@ -38,7 +46,11 @@ async fn main() -> std::io::Result<()> {
         App::new()
             // Add database connection pool to app state
             .app_data(web::Data::new(pool.clone()))
-            .service(post_tweet)
+            .service(get_all_posts)
+            .service(get_post_by_id)
+            .service(create_post)
+            .service(update_post)
+            .service(delete_post)
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}")
                     .url("/api-docs/openapi.json", ApiDoc::openapi()),
