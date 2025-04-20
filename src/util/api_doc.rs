@@ -24,21 +24,20 @@ impl Modify for SecurityAddon {
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        auth_controller::register,
+        auth_controller::login,
         post_controller::get_all_posts,
         post_controller::get_post_by_id,
         post_controller::create_post,
         post_controller::update_post,
         post_controller::delete_post,
-        auth_controller::register,
-        auth_controller::login
     ),
     components(schemas(
         post::Post, 
-        post::CreatePostRequest, 
         user::User,
         auth_controller::LoginRequest,
         auth_controller::RegisterRequest,
-        auth_controller::AuthResponse
+        auth_controller::AuthResponse,
     )),
     modifiers(&SecurityAddon)
 )]

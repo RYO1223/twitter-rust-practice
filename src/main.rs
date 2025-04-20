@@ -5,16 +5,17 @@ mod schema;
 mod util;
 
 use actix_web::{App, HttpServer, middleware::Logger, web};
+use dotenv::dotenv;
+use std::env;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use controllers::auth_controller::{login, register};
-use controllers::post_controller::{
-    create_post, delete_post, get_all_posts, get_post_by_id, update_post,
+use controllers::{
+    auth_controller::{login, register},
+    post_controller::{create_post, delete_post, get_all_posts, get_post_by_id, update_post},
 };
-use dotenv::dotenv;
-use middlewares::auth::AuthMiddleware;
-use std::env;
+use middlewares::auth_middleware::AuthMiddleware;
+use util::db;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -22,7 +23,7 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok();
 
     // Set up database connection pool
-    let pool = util::db::establish_connection_pool();
+    let pool = db::establish_connection_pool();
 
     // Optional: Log the port we're running on
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
@@ -46,19 +47,20 @@ async fn main() -> std::io::Result<()> {
             // Add logging middleware
             .wrap(Logger::default())
             // Public routes (no auth required)
-            .service(web::scope("/auth").service(register).service(login))
-            // Public endpoint to get all posts
-            .service(get_all_posts)
-            .service(get_post_by_id)
-            // Protected routes (auth required)
-            .wrap(auth_middleware) // Apply auth middleware with ignore routes
-            .service(create_post)
-            .service(update_post)
-            .service(delete_post)
+            .service(register)
+            .service(login)
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}")
                     .url("/api-docs/openapi.json", util::api_doc::ApiDoc::openapi()),
             )
+            .wrap(auth_middleware)
+            // Public endpoint to get all posts
+            .service(get_all_posts)
+            .service(get_post_by_id)
+            // Protected routes (auth required)
+            .service(create_post)
+            .service(update_post)
+            .service(delete_post)
     })
     .bind(&bind_address)?
     .run()

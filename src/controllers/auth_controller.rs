@@ -4,11 +4,11 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::util::db::DbPool;
-use crate::middlewares::auth::Authentication;
 use crate::models::user::{NewUser, User};
+use crate::util::auth::Authentication;
+use crate::util::db::DbPool;
 
-#[derive(Deserialize, Serialize,ToSchema)]
+#[derive(Deserialize, Serialize, ToSchema)]
 #[schema(
     example = json!({
         "username": "johndoe",
@@ -41,8 +41,6 @@ pub struct RegisterRequest {
 
 /// Register a new user
 #[utoipa::path(
-    post,
-    path = "/auth/register",
     request_body = RegisterRequest,
     responses(
         (status = 200, description = "User registered successfully"),
@@ -50,7 +48,7 @@ pub struct RegisterRequest {
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[post("/register")]
+#[post("/auth/register")]
 pub async fn register(
     pool: web::Data<DbPool>,
     user_data: web::Json<RegisterRequest>,
@@ -89,7 +87,7 @@ pub async fn register(
     };
 
     // Generate a token for the newly registered user
-    let token = match Authentication::create_token(user.id, &user.username) {
+    let token = match Authentication::create_token(user.id) {
         Ok(token) => token,
         Err(_) => return HttpResponse::InternalServerError().body("Token generation failed"),
     };
@@ -104,8 +102,6 @@ pub async fn register(
 
 /// Login an existing user
 #[utoipa::path(
-    post,
-    path = "/auth/login",
     request_body = LoginRequest,
     responses(
         (status = 200, description = "Login successful"),
@@ -113,7 +109,7 @@ pub async fn register(
         (status = 500, description = "Internal server error"),
     ),
 )]
-#[post("/login")]
+#[post("/auth/login")]
 pub async fn login(pool: web::Data<DbPool>, login_data: web::Json<LoginRequest>) -> impl Responder {
     use crate::schema::users::dsl::*;
 
@@ -153,7 +149,7 @@ pub async fn login(pool: web::Data<DbPool>, login_data: web::Json<LoginRequest>)
     }
 
     // Generate JWT token
-    let token = match Authentication::create_token(user.id, &user.username) {
+    let token = match Authentication::create_token(user.id) {
         Ok(token) => token,
         Err(_) => return HttpResponse::InternalServerError().body("Token generation failed"),
     };

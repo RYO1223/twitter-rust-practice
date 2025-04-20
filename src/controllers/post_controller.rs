@@ -1,18 +1,18 @@
-use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
+use actix_web::{HttpMessage, HttpRequest, HttpResponse, Responder, delete, get, post, put, web};
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
+use serde::Deserialize;
 use serde_json::json;
+use utoipa::ToSchema;
 
 use crate::models::{
-    post::{CreatePostRequest, NewPost, Post},
-    user::{NewUser, User},
+    post::{NewPost, Post},
+    user::{AuthedUserId, User},
 };
 use crate::schema::{posts, users};
 use crate::util::db::DbPool;
 
 /// Get all posts
 #[utoipa::path(
-    get,
-    path = "/posts",
     security(
         ("bearer_auth" = [])
     ),
@@ -77,8 +77,6 @@ pub async fn get_all_posts(pool: web::Data<DbPool>) -> impl Responder {
 
 /// Get a post by ID
 #[utoipa::path(
-    get,
-    path = "/posts/{id}",
     security(
         ("bearer_auth" = [])
     ),
@@ -138,10 +136,15 @@ pub async fn get_post_by_id(pool: web::Data<DbPool>, id: web::Path<i32>) -> impl
     }
 }
 
+/// Used for API requests when creating a new post
+#[derive(Deserialize, ToSchema)]
+pub struct CreatePostRequest {
+    /// Content of the tweet
+    pub content: String,
+}
+
 /// Create a new post
 #[utoipa::path(
-    post,
-    path = "/posts",
     request_body = CreatePostRequest,
     security(
         ("bearer_auth" = [])
@@ -155,36 +158,19 @@ pub async fn get_post_by_id(pool: web::Data<DbPool>, id: web::Path<i32>) -> impl
 )]
 #[post("/posts")]
 pub async fn create_post(
+    req: HttpRequest,
     pool: web::Data<DbPool>,
     post_req: web::Json<CreatePostRequest>,
 ) -> impl Responder {
+    let user_id = req.extensions().get::<AuthedUserId>().unwrap().0;
+
     // Use a web::block to offload database operations to a separate thread
     let result = web::block(move || {
         let mut conn = pool.get().map_err(|_| "Failed to get DB connection")?;
 
-        // Find or create user
-        let user = users::table
-            .filter(users::username.eq(&post_req.username))
-            .first::<User>(&mut conn)
-            .optional()
-            .map_err(|_| "Database error finding user")?
-            .unwrap_or_else(|| {
-                // Create new user if not found
-                let new_user = NewUser {
-                    username: post_req.username.clone(),
-                    password_hash: "default_password_hash".to_string(), // Default password hash for users created via posts
-                };
-
-                diesel::insert_into(users::table)
-                    .values(&new_user)
-                    .get_result::<User>(&mut conn)
-                    .map_err(|_| "Failed to create user")
-                    .unwrap()
-            });
-
         // Create new post
         let new_post = NewPost {
-            user_id: user.id,
+            user_id: user_id,
             content: post_req.content.clone(),
         };
 
@@ -194,18 +180,12 @@ pub async fn create_post(
             .get_result::<Post>(&mut conn)
             .map_err(|_| "Failed to create post")?;
 
-        Ok::<_, &'static str>((user, post))
+        Ok::<_, &'static str>(post)
     })
     .await;
 
     match result {
-        Ok(Ok((user, post))) => HttpResponse::Created().json(json!({
-            "id": post.id,
-            "user_id": post.user_id,
-            "username": user.username,
-            "content": post.content,
-            "created_at": post.created_at,
-        })),
+        Ok(Ok(post)) => HttpResponse::Created().json(post),
         Ok(Err(e)) => HttpResponse::BadRequest().json(json!({
             "error": e
         })),
@@ -217,8 +197,6 @@ pub async fn create_post(
 
 /// Update an existing post
 #[utoipa::path(
-    put,
-    path = "/posts/{id}",
     request_body = CreatePostRequest,
     security(
         ("bearer_auth" = [])
@@ -232,68 +210,43 @@ pub async fn create_post(
 )]
 #[put("/posts/{id}")]
 pub async fn update_post(
+    req: HttpRequest,
     pool: web::Data<DbPool>,
     id: web::Path<i32>,
     post_req: web::Json<CreatePostRequest>,
 ) -> impl Responder {
     let post_id = id.into_inner();
 
+    let user_id = req.extensions().get::<AuthedUserId>().unwrap().0;
+
     // Use a web::block to offload database operations to a separate thread
     let result = web::block(move || {
         let mut conn = pool.get().map_err(|_| "Failed to get DB connection")?;
 
-        // Check if post exists
-        let post_exists = posts::table
+        let post = posts::table
             .find(post_id)
+            .filter(posts::user_id.eq(user_id))
             .first::<Post>(&mut conn)
             .optional()
-            .map_err(|_| "Database error checking post")?;
+            .map_err(|_| "Database error finding post")?;
 
-        if post_exists.is_none() {
+        if post.is_none() {
             return Ok::<_, &'static str>(None);
         }
-
-        // Find or create user
-        let user = users::table
-            .filter(users::username.eq(&post_req.username))
-            .first::<User>(&mut conn)
-            .optional()
-            .map_err(|_| "Database error finding user")?
-            .unwrap_or_else(|| {
-                // Create new user if not found
-                let new_user = NewUser {
-                    username: post_req.username.clone(),
-                    password_hash: "default_password_hash".to_string(), // Default password hash for users created via posts
-                };
-
-                diesel::insert_into(users::table)
-                    .values(&new_user)
-                    .get_result::<User>(&mut conn)
-                    .map_err(|_| "Failed to create user")
-                    .unwrap()
-            });
+        let post = post.unwrap();
 
         // Update post
-        let updated_post = diesel::update(posts::table.find(post_id))
-            .set((
-                posts::content.eq(&post_req.content),
-                posts::user_id.eq(user.id),
-            ))
+        let updated_post = diesel::update(&post)
+            .set(posts::content.eq(&post_req.content))
             .get_result::<Post>(&mut conn)
             .map_err(|_| "Failed to update post")?;
 
-        Ok::<Option<(User, Post)>, &'static str>(Some((user, updated_post)))
+        Ok::<Option<Post>, &'static str>(Some(updated_post))
     })
     .await;
 
     match result {
-        Ok(Ok(Some((user, post)))) => HttpResponse::Ok().json(json!({
-            "id": post.id,
-            "user_id": post.user_id,
-            "username": user.username,
-            "content": post.content,
-            "created_at": post.created_at,
-        })),
+        Ok(Ok(Some(post))) => HttpResponse::Ok().json(post),
         Ok(Ok(None)) => HttpResponse::NotFound().json(json!({
             "error": "Post not found"
         })),
@@ -308,8 +261,6 @@ pub async fn update_post(
 
 /// Delete a post
 #[utoipa::path(
-    delete,
-    path = "/posts/{id}",
     security(
         ("bearer_auth" = [])
     ),

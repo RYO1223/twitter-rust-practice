@@ -37,12 +37,3 @@ pub struct NewPost {
     /// Content of the tweet
     pub content: String,
 }
-
-/// Used for API requests when creating a new post
-#[derive(Deserialize, ToSchema)]
-pub struct CreatePostRequest {
-    /// Username of the person posting the tweet
-    pub username: String,
-    /// Content of the tweet
-    pub content: String,
-}

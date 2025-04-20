@@ -35,3 +35,5 @@ pub struct NewUser {
     /// Password hash for authentication
     pub password_hash: String,
 }
+
+pub struct AuthedUserId(pub i32);

@@ -1,2 +1,2 @@
 // Export middleware modules
-pub mod auth;
+pub mod auth_middleware;

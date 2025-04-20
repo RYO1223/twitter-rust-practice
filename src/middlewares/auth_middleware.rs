@@ -5,51 +5,9 @@ use actix_web::{
     http::header,
 };
 use futures_util::future::{LocalBoxFuture, Ready, ready};
-use jwt_simple::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::{env, rc::Rc};
+use std::rc::Rc;
 
-// Claims structure for JWT payload
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AuthClaims {
-    pub user_id: i32,
-    pub username: String,
-}
-
-// Authentication utility
-pub struct Authentication;
-
-impl Authentication {
-    // Function to create a new JWT token
-    pub fn create_token(user_id: i32, username: &str) -> Result<String, String> {
-        let key = get_jwt_key();
-
-        let claims = Claims::with_custom_claims(
-            AuthClaims {
-                user_id,
-                username: username.to_owned(),
-            },
-            Duration::from_days(7),
-        );
-
-        key.authenticate(claims)
-            .map_err(|e| format!("Error creating token: {}", e))
-    }
-
-    // Function to verify and extract claims from token
-    pub fn verify_token(token: &str) -> Result<JWTClaims<AuthClaims>, String> {
-        let key = get_jwt_key();
-
-        key.verify_token::<AuthClaims>(token, None)
-            .map_err(|e| format!("Error verifying token: {}", e))
-    }
-}
-
-// Helper function to get JWT key
-fn get_jwt_key() -> HS256Key {
-    let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set in .env file");
-    HS256Key::from_bytes(secret.as_bytes())
-}
+use crate::{models::user::AuthedUserId, util::auth::Authentication};
 
 // Auth middleware factory
 pub struct AuthMiddleware {
@@ -148,29 +106,31 @@ where
         };
 
         // Verify token
-        match Authentication::verify_token(token) {
-            Ok(claims) => {
-                // Insert auth claims into request extensions
-                req.extensions_mut().insert(claims.custom);
+        let claims = match Authentication::verify_token(token) {
+            Ok(claims) => claims,
 
-                let fut = service.call(req);
-                Box::pin(async move {
-                    let res = fut.await?;
-                    Ok(res)
-                })
+            Err(_) => {
+                return Box::pin(async move { Err(ErrorUnauthorized("Invalid or expired token")) });
             }
-            Err(_) => Box::pin(async move { Err(ErrorUnauthorized("Invalid or expired token")) }),
-        }
-    }
-}
+        };
 
-// Extension trait to extract auth claims from requests
-pub trait AuthenticatedRequest {
-    fn get_auth_claims(&self) -> Option<AuthClaims>;
-}
+        let user_id = match claims.subject {
+            Some(user_id_string) => user_id_string
+                .parse::<i32>()
+                .expect("Invalid user ID in token"),
 
-impl AuthenticatedRequest for ServiceRequest {
-    fn get_auth_claims(&self) -> Option<AuthClaims> {
-        self.extensions().get::<AuthClaims>().cloned()
+            None => {
+                return Box::pin(async move { Err(ErrorUnauthorized("Invalid token claims")) });
+            }
+        };
+
+        // Token is valid, proceed with the request
+        req.extensions_mut().insert(AuthedUserId(user_id));
+
+        let fut = service.call(req);
+        Box::pin(async move {
+            let res = fut.await?;
+            Ok(res)
+        })
     }
 }
