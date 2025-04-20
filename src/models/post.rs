@@ -3,7 +3,7 @@ use diesel::{Associations, Identifiable, Insertable, Queryable};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::models::User;
+use crate::models::user::User;
 use crate::schema::posts;
 
 /// Represents a tweet post with user information and content in the database

@@ -4,8 +4,8 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::config::db::DbPool;
-use crate::middleware::auth::Authentication;
+use crate::util::db::DbPool;
+use crate::middlewares::auth::Authentication;
 use crate::models::user::{NewUser, User};
 
 #[derive(Deserialize, Serialize,ToSchema)]

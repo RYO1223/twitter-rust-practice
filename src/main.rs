@@ -1,11 +1,11 @@
-mod config;
 mod controllers;
-mod middleware;
+mod middlewares;
 mod models;
 mod schema;
+mod util;
 
 use actix_web::{App, HttpServer, middleware::Logger, web};
-use utoipa::{OpenApi, Modify, openapi::security::{SecurityScheme, Http, HttpAuthScheme}};
+use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use controllers::auth_controller::{login, register};
@@ -13,46 +13,8 @@ use controllers::post_controller::{
     create_post, delete_post, get_all_posts, get_post_by_id, update_post,
 };
 use dotenv::dotenv;
-use middleware::auth::AuthMiddleware;
+use middlewares::auth::AuthMiddleware;
 use std::env;
-
-// Define security scheme modifier for OpenAPI docs
-struct SecurityAddon;
-
-impl Modify for SecurityAddon {
-    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        // Add security scheme component
-        if let Some(components) = &mut openapi.components {
-            components.add_security_scheme(
-                "bearer_auth", 
-                SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer))
-            );
-        }
-    }
-}
-
-#[derive(OpenApi)]
-#[openapi(
-    paths(
-        controllers::post_controller::get_all_posts,
-        controllers::post_controller::get_post_by_id,
-        controllers::post_controller::create_post,
-        controllers::post_controller::update_post,
-        controllers::post_controller::delete_post,
-        controllers::auth_controller::register,
-        controllers::auth_controller::login
-    ),
-    components(schemas(
-        models::Post, 
-        models::CreatePostRequest, 
-        models::User,
-        controllers::auth_controller::LoginRequest,
-        controllers::auth_controller::RegisterRequest,
-        controllers::auth_controller::AuthResponse
-    )),
-    modifiers(&SecurityAddon)
-)]
-struct ApiDoc;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -60,7 +22,7 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok();
 
     // Set up database connection pool
-    let pool = crate::config::db::establish_connection_pool();
+    let pool = util::db::establish_connection_pool();
 
     // Optional: Log the port we're running on
     let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
@@ -95,7 +57,7 @@ async fn main() -> std::io::Result<()> {
             .service(delete_post)
             .service(
                 SwaggerUi::new("/swagger-ui/{_:.*}")
-                    .url("/api-docs/openapi.json", ApiDoc::openapi()),
+                    .url("/api-docs/openapi.json", util::api_doc::ApiDoc::openapi()),
             )
     })
     .bind(&bind_address)?

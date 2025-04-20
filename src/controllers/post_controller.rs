@@ -2,9 +2,12 @@ use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use serde_json::json;
 
-use crate::config::db::DbPool;
-use crate::models::{CreatePostRequest, NewPost, NewUser, Post, User};
+use crate::models::{
+    post::{CreatePostRequest, NewPost, Post},
+    user::{NewUser, User},
+};
 use crate::schema::{posts, users};
+use crate::util::db::DbPool;
 
 /// Get all posts
 #[utoipa::path(
